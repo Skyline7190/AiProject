@@ -64,6 +64,12 @@ public final class SearchTester {
                 searcher = feeder.getAStar(heuristicType);
             }
 
+            // 【修改】 在PDB构建时，第一次搜索会很慢，这是正常的
+            System.out.println("Solving problems using heuristic: " + heuristicType);
+            if (heuristicType == DISJOINT_PATTERN && step == 3) {
+                System.out.println("(第一次运行时 PDB 会进行构建，请耐心等待...)");
+            }
+
             solveProblems(problems, searcher, heuristicType);
             System.out.println();
         }
@@ -71,6 +77,7 @@ public final class SearchTester {
 
     /**
      * 根据问题类型和当前阶段，获取所有启发函数的类型
+     * 使用 PDB
      * @param type
      * @param step
      * @return
@@ -90,8 +97,10 @@ public final class SearchTester {
             }
             //NPuzzle问题的第三阶段
             else if (step == 3){
-                // *** 使用我们新的、更强大的启发函数 ***
-                heuristics.add(MANHATTAN_PLUS_LINEAR_CONFLICTS);
+                // *** 【修改】 使用 PDB ***
+                heuristics.add(DISJOINT_PATTERN);
+                // 你也可以保留这个来进行对比
+                // heuristics.add(MANHATTAN_PLUS_LINEAR_CONFLICTS);
             }
         }
         return heuristics;
@@ -120,7 +129,7 @@ public final class SearchTester {
             // 解路径的可视化
             problem.showSolution(path);
 
-            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + path.size() + "，执行了" + time1 + "s，" +
+            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size()) + "，执行了" + time1 + "s，" +
                     "共生成了" + searcher.nodesGenerated() + "个结点，" +
                     "扩展了" + searcher.nodesExpanded() + "个结点");
         }
