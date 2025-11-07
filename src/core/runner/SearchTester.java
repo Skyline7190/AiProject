@@ -54,11 +54,10 @@ public final class SearchTester {
         for (HeuristicType heuristicType : heuristics) {
             AbstractSearcher searcher;
 
-            // *** 这是关键的修复 ***
             // 阶段 3: 使用 IDA*
             // 阶段 1 & 2: 使用 A*
             if (step == 3) {
-                System.out.println("--- Running IDA* Search ---"); // <-- 将会打印
+                System.out.println("--- Running IDA* Search ---");
                 searcher = feeder.getIdaStar(heuristicType);
             } else {
                 System.out.println("--- Running A* Search ---");
@@ -86,15 +85,13 @@ public final class SearchTester {
         }
         else {
             //NPuzzle问题的第一、二阶段
-            if (step == 1 || step == 2) { // 阶段 1 & 2
-                // heuristics.add(MISPLACED); // 暂时禁用 MISPLACED
+            if (step == 1 || step == 2) {
                 heuristics.add(MANHATTAN);
             }
             //NPuzzle问题的第三阶段
             else if (step == 3){
-                // *** 这是关键的修复 ***
-                // 阶段 3 同样使用 MANHATTAN (配合 IDA* 算法)
-                heuristics.add(MANHATTAN);
+                // *** 使用我们新的、更强大的启发函数 ***
+                heuristics.add(MANHATTAN_PLUS_LINEAR_CONFLICTS);
             }
         }
         return heuristics;
