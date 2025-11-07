@@ -34,13 +34,13 @@ public final class SearchTester {
                 Class.forName(args[3])
                         .getDeclaredConstructor().newInstance();
 
-    ////从文件读入所有输入样例的文本； args[0]：输入样例文件的相对路径
+        ////从文件读入所有输入样例的文本； args[0]：输入样例文件的相对路径
         Scanner scanner = new Scanner(new File(args[0]));
         ArrayList<String> problemLines = getProblemLines(scanner);
 
         //feeder从输入样例文本获取寻路问题的所有实例
         ArrayList<Problem> problems = feeder.getProblems(problemLines);
-    ////问题实例读入到ArrayList中
+        ////问题实例读入到ArrayList中
 
         //当前问题的类型 args[1]    寻路问题，数字推盘，野人传教士过河等
         ProblemType type = ProblemType.valueOf(args[1]);
@@ -51,10 +51,21 @@ public final class SearchTester {
         //寻路问题分别使用Grid距离和Euclid距离作为启发函数
         ArrayList<HeuristicType> heuristics = getHeuristicTypes(type, step);
 
-        for (HeuristicType heuristicType : heuristics) { 
-            //solveProblems方法根据不同启发函数生成不同的searcher
-            //从Feeder获取所使用的搜索引擎（AStar，IDAStar等），     
-            solveProblems(problems, feeder.getAStar(heuristicType), heuristicType);
+        for (HeuristicType heuristicType : heuristics) {
+            AbstractSearcher searcher;
+
+            // *** 这是关键的修复 ***
+            // 阶段 3: 使用 IDA*
+            // 阶段 1 & 2: 使用 A*
+            if (step == 3) {
+                System.out.println("--- Running IDA* Search ---"); // <-- 将会打印
+                searcher = feeder.getIdaStar(heuristicType);
+            } else {
+                System.out.println("--- Running A* Search ---");
+                searcher = feeder.getAStar(heuristicType);
+            }
+
+            solveProblems(problems, searcher, heuristicType);
             System.out.println();
         }
     }
@@ -74,14 +85,16 @@ public final class SearchTester {
             heuristics.add(PF_EUCLID);
         }
         else {
-            //NPuzzle问题的第一阶段，使用不在位将牌和曼哈顿距离
-            if (step == 1) {
-                heuristics.add(MISPLACED);
+            //NPuzzle问题的第一、二阶段
+            if (step == 1 || step == 2) { // 阶段 1 & 2
+                // heuristics.add(MISPLACED); // 暂时禁用 MISPLACED
                 heuristics.add(MANHATTAN);
             }
-            //NPuzzle问题的第三阶段，使用Disjoint Pattern
+            //NPuzzle问题的第三阶段
             else if (step == 3){
-                heuristics.add(DISJOINT_PATTERN);
+                // *** 这是关键的修复 ***
+                // 阶段 3 同样使用 MANHATTAN (配合 IDA* 算法)
+                heuristics.add(MANHATTAN);
             }
         }
         return heuristics;

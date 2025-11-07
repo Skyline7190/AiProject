@@ -22,8 +22,9 @@ public class PuzzleBoard extends State {
     private final int blankRow; // 空白格 '0' 的行号
     private final int blankCol; // 空白格 '0' 的列号
 
-    // 用于快速查找曼哈顿距离的目标位置
+    // --- 缓存字段 ---
     private static Map<Integer, int[]> goalPositionsCache;
+    private static PuzzleBoard cachedGoal;
 
     /**
      * 构造函数
@@ -34,15 +35,11 @@ public class PuzzleBoard extends State {
         this.size = size;
         this.board = board;
 
-        // 寻找空白格 '0' 的位置
         int[] blankPos = findBlank(board, size);
         this.blankRow = blankPos[0];
         this.blankCol = blankPos[1];
     }
 
-    /**
-     * 辅助函数：寻找空白格 '0'
-     */
     private int[] findBlank(int[][] board, int size) {
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
@@ -51,35 +48,28 @@ public class PuzzleBoard extends State {
                 }
             }
         }
-        return new int[]{-1, -1}; // 理论上不会发生
+        return new int[]{-1, -1};
     }
 
-    /**
-     * 在控制台打印当前棋盘状态
-     */
     @Override
     public void draw() {
         System.out.println("-------");
+        // 使用制表符 \t 来对齐，确保 15-Puzzle 也能对齐
+        int maxDigits = String.valueOf(size * size - 1).length() + 1;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                System.out.print(board[i][j] + " ");
+                System.out.printf("%-" + maxDigits + "s", board[i][j]);
             }
             System.out.println();
         }
         System.out.println("-------");
     }
 
-    /**
-     * 根据传入的动作（Move），生成并返回一个新的状态（PuzzleBoard）
-     * @param action 要执行的动作 (PuzzleMove)
-     * @return 执行动作后的新状态
-     */
     @Override
     public State next(Action action) {
         PuzzleMove move = (PuzzleMove) action;
         int newRow = blankRow, newCol = blankCol;
 
-        // 计算空白格的新位置
         switch (move.getDirection()) {
             case UP:    newRow--; break;
             case DOWN:  newRow++; break;
@@ -87,24 +77,17 @@ public class PuzzleBoard extends State {
             case RIGHT: newCol++; break;
         }
 
-        // 复制当前棋盘到新棋盘
         int[][] newBoard = new int[size][];
         for (int i = 0; i < size; i++) {
             newBoard[i] = Arrays.copyOf(board[i], size);
         }
 
-        // 在新棋盘上交换方块
         newBoard[blankRow][blankCol] = newBoard[newRow][newCol];
-        newBoard[newRow][newCol] = 0; // '0' 移动到新位置
+        newBoard[newRow][newCol] = 0;
 
         return new PuzzleBoard(size, newBoard);
     }
 
-    /**
-     * 返回所有可能的动作（上、下、左、右）
-     * 注意：这里返回所有4个方向，具体的“适用性”检查由 NPuzzleProblem.applicable() 完成
-     * @return 包含4个方向的 PuzzleMove 列表
-     */
     @Override
     public Iterable<? extends Action> actions() {
         List<Action> moves = new ArrayList<>();
@@ -115,25 +98,17 @@ public class PuzzleBoard extends State {
         return moves;
     }
 
-    // --- 核心方法：equals 和 hashCode ---
-
-    /**
-     * 比较两个 PuzzleBoard 状态是否相同
-     * @param obj 另一个对象
-     * @return 如果棋盘布局完全相同，则为 true
-     */
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         PuzzleBoard that = (PuzzleBoard) obj;
+        if (this.size != that.size || this.blankRow != that.blankRow || this.blankCol != that.blankCol) {
+            return false;
+        }
         return Arrays.deepEquals(this.board, that.board);
     }
 
-    /**
-     * 为当前棋盘状态生成哈希码
-     * @return 哈希码
-     */
     @Override
     public int hashCode() {
         return Arrays.deepHashCode(board);
@@ -142,10 +117,25 @@ public class PuzzleBoard extends State {
     // --- 启发式函数 (Heuristics) ---
 
     /**
-     * 启发式函数 1：错位将牌数 (Misplaced Tiles)
+     * 确保目标位置的缓存已经为 'goal' 棋盘构建。
      * @param goal 目标状态
-     * @return 不在目标位置的方块数量（不包括空白格）
      */
+    private void ensureCache(PuzzleBoard goal) {
+        // 检查缓存是否为空，或者是否是为 *不同* 的目标（例如, 从 8-puzzle 切换到 15-puzzle）
+        if (goalPositionsCache == null || !goal.equals(cachedGoal)) {
+            // 如果是新目标，重建缓存
+            goalPositionsCache = new HashMap<>();
+            cachedGoal = goal; // 记住我们是为这个目标构建的缓存
+            int goalSize = goal.getSize(); // 从 goal 获取大小
+
+            for (int i = 0; i < goalSize; i++) {
+                for (int j = 0; j < goalSize; j++) {
+                    goalPositionsCache.put(goal.board[i][j], new int[]{i, j});
+                }
+            }
+        }
+    }
+
     public int misplaced(PuzzleBoard goal) {
         int count = 0;
         for (int i = 0; i < size; i++) {
@@ -158,25 +148,12 @@ public class PuzzleBoard extends State {
         return count;
     }
 
-    /**
-     * 启发式函数 2：曼哈顿距离 (Manhattan Distance)
-     * @param goal 目标状态
-     * @return 所有方块到其目标位置的曼哈顿距离之和
-     */
     public int manhattan(PuzzleBoard goal) {
-        // 懒加载并缓存目标位置
-        if (goalPositionsCache == null) {
-            goalPositionsCache = new HashMap<>();
-            for (int i = 0; i < size; i++) {
-                for (int j = 0; j < size; j++) {
-                    goalPositionsCache.put(goal.board[i][j], new int[]{i, j});
-                }
-            }
-        }
+        ensureCache(goal); // 确保缓存已为这个 goal 构建
 
         int distance = 0;
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
+        for (int i = 0; i < this.size; i++) {
+            for (int j = 0; j < this.size; j++) {
                 int tile = this.board[i][j];
                 if (tile != 0) {
                     int[] targetPos = goalPositionsCache.get(tile);
@@ -188,29 +165,91 @@ public class PuzzleBoard extends State {
     }
 
     /**
+     * 启发式函数 3：线性冲突 (Linear Conflicts)
+     * @param goal 目标状态
+     * @return 冲突数 * 2
+     */
+    public int linearConflicts(PuzzleBoard goal) {
+        ensureCache(goal); // 依赖于 manhattan 方法先建立的缓存
+        int conflicts = 0;
+
+        // 检查行冲突
+        for (int r = 0; r < size; r++) {
+            for (int c1 = 0; c1 < size; c1++) {
+                int tile1 = this.board[r][c1];
+                if (tile1 == 0) continue;
+
+                int[] goalPos1 = goalPositionsCache.get(tile1);
+                if (goalPos1[0] != r) continue; // tile1 不在它的目标行
+
+                for (int c2 = c1 + 1; c2 < size; c2++) {
+                    int tile2 = this.board[r][c2];
+                    if (tile2 == 0) continue;
+
+                    int[] goalPos2 = goalPositionsCache.get(tile2);
+                    if (goalPos2[0] != r) continue; // tile2 不在它的目标行
+
+                    // 两个 tile 都在它们的目标行
+                    // 检查它们是否颠倒了
+                    if (goalPos1[1] > goalPos2[1]) { // tile1 的目标在 tile2 的右边
+                        // 但 tile1 (c1) 当前在 tile2 (c2) 的左边
+                        conflicts++;
+                    }
+                }
+            }
+        }
+
+        // 检查列冲突 (逻辑相同，交换 r 和 c)
+        for (int c = 0; c < size; c++) {
+            for (int r1 = 0; r1 < size; r1++) {
+                int tile1 = this.board[r1][c];
+                if (tile1 == 0) continue;
+
+                int[] goalPos1 = goalPositionsCache.get(tile1);
+                if (goalPos1[1] != c) continue; // tile1 不在它的目标列
+
+                for (int r2 = r1 + 1; r2 < size; r2++) {
+                    int tile2 = this.board[r2][c];
+                    if (tile2 == 0) continue;
+
+                    int[] goalPos2 = goalPositionsCache.get(tile2);
+                    if (goalPos2[1] != c) continue; // tile2 不在它的目标列
+
+                    // 两个 tile 都在它们的目标列
+                    if (goalPos1[0] > goalPos2[0]) { // tile1 的目标在 tile2 的下边
+                        // 但 tile1 (r1) 当前在 tile2 (r2) 的上边
+                        conflicts++;
+                    }
+                }
+            }
+        }
+
+        return conflicts * 2; // 每次冲突至少需要 2 次额外移动来解决
+    }
+
+    /**
      * 静态工厂方法：根据类型返回对应的启发式函数 (Predictor)
-     * @param type 启发式函数类型 (MISPLACED, MANHATTAN)
-     * @return 实现了 Predictor 接口的 Lambda 表达式
      */
     public static Predictor predictor(HeuristicType type) {
         switch (type) {
             case MISPLACED:
-                // state 和 goal 会在搜索时由 A* 算法传入
                 return (state, goal) -> ((PuzzleBoard) state).misplaced((PuzzleBoard) goal);
             case MANHATTAN:
                 return (state, goal) -> ((PuzzleBoard) state).manhattan((PuzzleBoard) goal);
+            case MANHATTAN_PLUS_LINEAR_CONFLICTS:
+                // 这是我们新的、更强大的启发函数
+                return (state, goal) -> {
+                    PuzzleBoard b = (PuzzleBoard) state;
+                    PuzzleBoard g = (PuzzleBoard) goal;
+                    return b.manhattan(g) + b.linearConflicts(g);
+                };
             default:
-                // 默认返回 0
                 return (state, goal) -> 0;
         }
     }
 
     // --- 可解性 (Solvability) ---
 
-    /**
-     * 计算逆序数
-     * @return 逆序数
-     */
     public int getInversions() {
         int inversions = 0;
         int[] flatBoard = new int[size * size];
@@ -223,7 +262,6 @@ public class PuzzleBoard extends State {
 
         for (int i = 0; i < flatBoard.length - 1; i++) {
             for (int j = i + 1; j < flatBoard.length; j++) {
-                // 不计算空白格 '0'
                 if (flatBoard[i] != 0 && flatBoard[j] != 0 && flatBoard[i] > flatBoard[j]) {
                     inversions++;
                 }
