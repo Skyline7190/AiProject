@@ -64,7 +64,7 @@ public final class SearchTester {
                 searcher = feeder.getAStar(heuristicType);
             }
 
-            // 【修改】 在PDB构建时，第一次搜索会很慢，这是正常的
+            // 在PDB构建时，第一次搜索会很慢，这是正常的
             System.out.println("Solving problems using heuristic: " + heuristicType);
             if (heuristicType == DISJOINT_PATTERN && step == 3) {
                 System.out.println("(第一次运行时 PDB 会进行构建，请耐心等待...)");

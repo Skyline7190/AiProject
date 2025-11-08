@@ -62,8 +62,8 @@ public class PuzzleBoard extends State {
         int maxDigits = String.valueOf(size * size - 1).length() + 1;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                // 对 "不关心" 的瓦片 (-1 或 15) 使用 '.'
-                String s = (board[i][j] == -1 || board[i][j] == 0xF) ? "." : String.valueOf(board[i][j]);
+                // 对 "不关心" 的瓦片 (-1 或 15) 使用 '*'
+                String s = (board[i][j] == -1 || board[i][j] == 0xF) ? "15" : String.valueOf(board[i][j]);
                 System.out.printf("%-" + maxDigits + "s", s);
             }
             System.out.println();
@@ -172,7 +172,7 @@ public class PuzzleBoard extends State {
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
 
-                // 【正确】先左移4位
+                // 先左移4位
                 key <<= 4;
 
                 int tile = this.board[i][j];
@@ -186,7 +186,7 @@ public class PuzzleBoard extends State {
                     tileValue = 0xF; // 15 (不关心)
                 }
 
-                // 【正确】或运算
+                // 或运算
                 key |= tileValue;
             }
         }
